@@ -43,7 +43,13 @@ app.use(auth(config));
 
 // req.isAuthenticated is provided from the auth router
 app.get('/', (req, res) => {
-  res.send(req.oidc.isAuthenticated() ? 'Logged in' : 'Logged out');
+  console.log(req.oidc.user);
+  res.send(req.oidc.isAuthenticated() ? `Logged in 
+  <h1 style="color:#008900; text-align:center">My Web App, Inc.</h1>
+  <h1>Welcome, ${req.oidc.user.given_name} ${req.oidc.user.family_name} </h1>
+  <p><strong>Username: ${req.oidc.user.nickname}</strong></p>
+  <p>${req.oidc.user.email}</p>
+  <img src="${req.oidc.user.picture}" />` : 'Logged out');
 });
 
 app.get('/cupcakes', async (req, res, next) => {
