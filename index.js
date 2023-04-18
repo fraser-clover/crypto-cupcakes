@@ -4,6 +4,7 @@ const express = require('express');
 const app = express();
 const morgan = require('morgan');
 const { PORT = 3000 } = process.env;
+const jwt = require('jsonwebtoken');
 // TODO - require express-openid-connect and destructure auth from it
 const { auth } = require('express-openid-connect');
 
@@ -12,6 +13,7 @@ const {
   AUTH0_AUDIENCE,
   AUTH0_CLIENT_ID,
   AUTH0_BASE_URL,
+  JWT_SECRET,
 } = process.env;
 
 const config = {
@@ -41,6 +43,28 @@ app.use(express.urlencoded({extended:true}));
   // auth router attaches /login, /logout, and /callback routes to the baseURL
 app.use(auth(config));
 
+
+app.use(async (req, res, next) => {
+  const [user] = await User.findOrCreate({
+  where: {
+     username: req.oidc.user.nickname,
+     name: req.oidc.user.name,
+     email: req.oidc.user.email
+  }
+  });
+  
+  console.log(req);
+  console.log(user);
+  next();
+
+  // stuff for bonus
+  // first, change authrequired in config to false
+  //   const auth = req.header('Authorization')
+//   const token = auth.split(' ')[1];
+
+// jwt.verify
+});
+
 // req.isAuthenticated is provided from the auth router
 app.get('/', (req, res) => {
   console.log(req.oidc.user);
@@ -59,6 +83,20 @@ app.get('/cupcakes', async (req, res, next) => {
   } catch (error) {
     console.error(error);
     next(error);
+  }
+});
+
+app.get('/me', async (req, res, next) => {
+  const user = await User.findOne({
+    where: {
+      username: req.oidc.user.nickname,
+    },
+    raw: true,
+  })
+
+  if (user) {
+    const token = jwt.sign(user, JWT_SECRET, { expiresIn: '1w' });
+    res.send({user, token})
   }
 });
 
