@@ -46,15 +46,27 @@ app.use(auth(config));
 app.use(async (req, res, next) => {
   // stuff for bonus
   // first, change authrequired in config to false
-  const auth = req.header("Authorization");
-  const token = auth.split(" ")[1];
+  const auth = req.headers["authorization"];
 
-  const isValid = jwt.verify(token);
-  if (isValid) {
-    const data = req.user;
-    res.send(data);
-    next();
+  if (auth) {
+    const token = auth.split(" ")[1];
+    const isValid = jwt.verify(token, JWT_SECRET, function (err){
+      res.status(401).send(err.message)
+    });
+
+    if (isValid) {
+      const data = req.oidc.user;
+      res.send(data);
+      next();
+    }
+  } else {
+    //console.log(req.headers);
+    res.redirect("/login")
   }
+  
+
+  // original work below
+  // first, change authrequired in config to true
 
   // const [user] = await User.findOrCreate({
   // where: {
@@ -89,11 +101,28 @@ app.get("/cupcakes", async (req, res, next) => {
   try {
     if (!req.oidc.user) {
       console.error("no user");
+      res.status(401);
     }
-    const { title, flavor, stars } = req.body;
-    const { userId } = req.user.id;
     const cupcakes = await Cupcake.findAll();
     res.send(cupcakes);
+  } catch (error) {
+    console.error(error);
+    next(error);
+  }
+});
+
+app.post("/cupcakes", async (req, res, next) => {
+  try {
+    if (!req.oidc.user) {
+      console.error("no user");
+      res.status(401);
+    }
+    const { userId } = req.user.id;
+    const { title, flavor, stars} = req.body;
+    
+    const cupcakes = await Cupcake.create(userId, title, flavor, stars);
+    res.status(201).send(cupcakes);
+
   } catch (error) {
     console.error(error);
     next(error);
