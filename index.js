@@ -5,7 +5,6 @@ const app = express();
 const morgan = require("morgan");
 const { PORT = 3000 } = process.env;
 const jwt = require("jsonwebtoken");
-// TODO - require express-openid-connect and destructure auth from it
 const { auth } = require("express-openid-connect");
 
 const {
@@ -17,7 +16,7 @@ const {
 } = process.env;
 
 const config = {
-  authRequired: false, // this is different from the documentation
+  authRequired: true, // this is different from the documentation
   auth0Logout: true,
   secret: AUTH0_SECRET,
   baseURL: AUTH0_AUDIENCE,
@@ -43,43 +42,67 @@ app.use(express.urlencoded({ extended: true }));
 // auth router attaches /login, /logout, and /callback routes to the baseURL
 app.use(auth(config));
 
+const setUser = (req, res, next) => {
+  try {
+    const auth = req.header("Authorization"); // checks all requests for Auth data
+    if(!auth){
+      next(); // if no Auth data then don't set any user
+    } else {
+      // if there is Auth data, find user from bearer token (see https://jwt.io/introduction)
+      const [ , token ] = auth.split(' '); // gets just the "token" part of Auth data
+      // console.log("token received:", token); // debug
+      // console.log("JWT_SECRET:", JWT_SECRET);
+      const user = jwt.verify(token, JWT_SECRET); // check if token is valid
+      // console.log("user:",user); // debug
+      req.user = user; // "save" this for API endpoints to use next...
+      next();
+    }
+  } catch (err) {
+    res.status(401);
+    next({err});
+  }
+}
+
 app.use(async (req, res, next) => {
   // stuff for bonus
   // first, change authrequired in config to false
-  const auth = req.headers["authorization"];
+  // const auth = req.headers["authorization"];
+  // console.log(auth)
+  // if (auth) {
+  //   const token = auth.split(" ")[1];
+  //   const isValid = jwt.verify(token, JWT_SECRET, function (err) {
+  //     res.status(401).send(err.message)
+  //   });
 
-  if (auth) {
-    const token = auth.split(" ")[1];
-    const isValid = jwt.verify(token, JWT_SECRET, function (err){
-      res.status(401).send(err.message)
-    });
-
-    if (isValid) {
-      const data = req.oidc.user;
-      res.send(data);
-      next();
-    }
-  } else {
-    //console.log(req.headers);
-    res.redirect("/login")
-  }
+  //   if (isValid) {
+  //     const data = req.oidc.user;
+  //     res.send(data);
+  //     next();
+  //   }
+  // }
+  // else {
+  //   //console.log(req.headers);
+  //   res.redirect("/login")
+  // }
   
 
   // original work below
   // first, change authrequired in config to true
 
-  // const [user] = await User.findOrCreate({
-  // where: {
-  //    username: req.oidc.user.nickname,
-  //    name: req.oidc.user.name,
-  //    email: req.oidc.user.email
-  // }
-  // });
+  const [user] = await User.findOrCreate({
+  where: {
+     username: req.oidc.user.nickname,
+     name: req.oidc.user.name,
+     email: req.oidc.user.email
+  }
+  });
 
-  // console.log(req);
-  // console.log(user);
-  // next();
-});
+  
+  console.log(req);
+  console.log(user);
+  console.log("IS IT AUTHENTICATED????", req.oidc.isAuthenticated())
+  next();
+ });
 
 
 // req.isAuthenticated is provided from the auth router
@@ -111,7 +134,7 @@ app.get("/cupcakes", async (req, res, next) => {
   }
 });
 
-app.post("/cupcakes", async (req, res, next) => {
+app.post("/cupcakes", setUser, async (req, res, next) => {
   try {
     if (!req.oidc.user) {
       console.error("no user");
@@ -119,7 +142,7 @@ app.post("/cupcakes", async (req, res, next) => {
     }
     const { userId } = req.user.id;
     const { title, flavor, stars} = req.body;
-    
+    console.log("CUPCAKE CREATEDDD", { title, flavor, stars})
     const cupcakes = await Cupcake.create(userId, title, flavor, stars);
     res.status(201).send(cupcakes);
 
