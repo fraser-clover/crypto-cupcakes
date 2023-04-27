@@ -140,10 +140,10 @@ app.post("/cupcakes", setUser, async (req, res, next) => {
       console.error("no user");
       res.status(401);
     }
-    const { userId } = req.user.id;
+    const userId = req.user.id;
     const { title, flavor, stars} = req.body;
     console.log("CUPCAKE CREATEDDD", { title, flavor, stars})
-    const cupcakes = await Cupcake.create(userId, title, flavor, stars);
+    const cupcakes = await Cupcake.create({userId, title, flavor, stars});
     res.status(201).send(cupcakes);
 
   } catch (error) {
